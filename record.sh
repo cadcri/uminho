@@ -22,7 +22,7 @@ perf annotate --stdio --source -n -i "$output_folder/records/c_SOR.data" > "$out
 
 # C LU
 gcc -g -o "$output_folder/compiled/LU" "tests/LU.c"
-perf record -e cycles:u -g -o "$output_folder/records/c_LU.data" -- "$output_folder/compiled/LU" 30000
+perf record -e cycles:u -g -o "$output_folder/records/c_LU.data" -- "$output_folder/compiled/LU" 300000
 perf annotate --stdio --source -n -i "$output_folder/records/c_LU.data" > "$output_folder/records/c_LU_annotate.txt"
 
 # C SPARSE
@@ -32,9 +32,9 @@ perf annotate --stdio --source -n -i "$output_folder/records/c_SPARSE.data" > "$
 
 # Java SOR
 javac -d $output_folder/compiled tests/SOR.java
-perf record -e cycles:u -g -k 1 -o $output_folder/records/java_SOR.data -- java -agentpath:/home/basto/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -cp $output_folder/compiled SOR 10000
-#perf inject --jit -i $output_folder/records/java_SOR.data > $output_folder/records/java_SOR.data.jitted
-#perf annotate --stdio --source -n -i $output_folder/records/java_SOR.data.jitted > $output_folder/records/java_SOR.annotate.txt
+perf record -e cycles:u -g -k 1 -o $output_folder/records/java_SOR.data -- java -agentpath:/usr/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -cp $output_folder/compiled SOR 10000
+perf inject --jit -i $output_folder/records/java_SOR.data -o $output_folder/records/java_SOR.data.jitted
+perf annotate --stdio --source -n -i $output_folder/records/java_SOR.data.jitted > $output_folder/records/java_SOR.annotate.txt
 
 # Java LU
 javac -d $output_folder/compiled tests/LU.java
@@ -50,7 +50,7 @@ perf record -e cycles:u -g -k 1 -o $output_folder/records/java_SOR.data -- java 
 
 
 
-
+##### TODO
 
 #cp Viewer.java $output_folder/viewer
 
