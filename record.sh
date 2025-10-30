@@ -1,65 +1,67 @@
 #!/bin/bash
 
-# create folders for keeping the results
-output_folder="results/$(date "+%Y%m%d_%H%M%S")"
+OUT="results/$(date "+%Y%m%d_%H%M%S")"
 
-mkdir -p $output_folder/sources
-mkdir -p $output_folder/compiled
-mkdir -p $output_folder/records
+mkdir -p $OUT/sources
+mkdir -p $OUT/compiled
+mkdir -p $OUT/records
 
-# copy sources
-cp tests/* $output_folder/sources
+cp tests/* $OUT/sources
 
-# C QuickSort
-gcc -g -o "$output_folder/compiled/QuickSort" "tests/QuickSort.c"
-perf record -e cycles:u -g -o "$output_folder/records/c_QuickSort.data" -- "$output_folder/compiled/QuickSort" numbers.txt
-perf annotate --stdio --source -n -i "$output_folder/records/c_QuickSort.data" > "$output_folder/records/c_QuickSort_annotate.txt"
+C_COMPILER_ARGS="-g"
+C_RECORD_ARGS="-F 10000 -e cycles:u -g"
+C_ANNOTATE_ARGS="--stdio --source -n"
 
-# C SOR
-gcc -g -o "$output_folder/compiled/SOR" "tests/SOR.c"
-perf record -e cycles:u -g -o "$output_folder/records/c_SOR.data" -- "$output_folder/compiled/SOR" 10000
-perf annotate --stdio --source -n -i "$output_folder/records/c_SOR.data" > "$output_folder/records/c_SOR_annotate.txt"
+gcc $C_COMPILER_ARGS -o $OUT/compiled/SOR tests/SOR.c
+perf record $C_RECORD_ARGS -o $OUT/records/c_SOR.data $OUT/compiled/SOR 10000
+perf annotate $C_ANNOTATE_ARGS -i $OUT/records/c_SOR.data > $OUT/records/c_SOR_annotate.txt
 
-# C LU
-gcc -g -o "$output_folder/compiled/LU" "tests/LU.c"
-perf record -e cycles:u -g -o "$output_folder/records/c_LU.data" -- "$output_folder/compiled/LU" 300000
-perf annotate --stdio --source -n -i "$output_folder/records/c_LU.data" > "$output_folder/records/c_LU_annotate.txt"
+gcc $C_COMPILER_ARGS -o $OUT/compiled/LU tests/LU.c
+perf record $C_RECORD_ARGS -o $OUT/records/c_LU.data $OUT/compiled/LU 300000
+perf annotate $C_ANNOTATE_ARGS -i $OUT/records/c_LU.data > $OUT/records/c_LU_annotate.txt
 
-# C SPARSE
-gcc -g -o "$output_folder/compiled/SPARSE" "tests/SPARSE.c"
-perf record -e cycles:u -g -o "$output_folder/records/c_SPARSE.data" -- "$output_folder/compiled/SPARSE" 100000000
-perf annotate --stdio --source -n -i "$output_folder/records/c_SPARSE.data" > "$output_folder/records/c_SPARSE_annotate.txt"
+gcc $C_COMPILER_ARGS -o $OUT/compiled/SPARSE tests/SPARSE.c
+perf record $C_RECORD_ARGS -o $OUT/records/c_SPARSE.data $OUT/compiled/SPARSE 100000000
+perf annotate $C_ANNOTATE_ARGS -i $OUT/records/c_SPARSE.data > $OUT/records/c_SPARSE_annotate.txt
 
-# Java SOR
-javac -d $output_folder/compiled tests/SOR.java
-perf record -e cycles:u -g -k 1 -o $output_folder/records/java_SOR.data -- java -agentpath:/usr/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -cp $output_folder/compiled SOR 10000
-perf inject --jit -i $output_folder/records/java_SOR.data -o $output_folder/records/java_SOR.data.jitted
-perf annotate --stdio --source -n -i $output_folder/records/java_SOR.data.jitted > $output_folder/records/java_SOR.annotate.txt
-
-# Java LU
-javac -d $output_folder/compiled tests/LU.java
-perf record -e cycles:u -g -k 1 -o $output_folder/records/java_SOR.data -- java -agentpath:/home/basto/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -cp $output_folder/compiled -Xmx8g LU 30000
-
-# Java SPARSE
-javac -d $output_folder/compiled tests/SPARSE.java
-perf record -e cycles:u -g -k 1 -o $output_folder/records/java_SOR.data -- java -agentpath:/home/basto/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -cp $output_folder/compiled -Xmx8g SPARSE 100000000
-
-# Java QuickSort
-javac -d $output_folder/compiled tests/QuickSort.java
-perf record -e cycles:u -g -k 1 -o $output_folder/records/java_SOR.data -- java -agentpath:/home/basto/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -cp $output_folder/compiled -Xmx8g QuickSort numbers.txt
+gcc $C_COMPILER_ARGS -o $OUT/compiled/QuickSort tests/QuickSort.c
+perf record $C_RECORD_ARGS -o $OUT/records/c_QuickSort.data $OUT/compiled/QuickSort numbers.txt
+perf annotate $C_ANNOTATE_ARGS -i $OUT/records/c_QuickSort.data > $OUT/records/c_QuickSort_annotate.txt
 
 
+J_RECORD_ARGS="-F 10000 -e cycles:u -g -k 1"
+J_RECORD_JVM_ARGS="-cp $OUT/compiled -Xmx8g -agentpath:/usr/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer"
+J_INJECT_ARGS="--jit"
+J_ANNOTATE_ARDS="--stdio --source -n"
 
-##### TODO
+javac -d $OUT/compiled tests/SOR.java
+perf record $J_RECORD_ARGS -o $OUT/records/java_SOR.data java $J_RECORD_JVM_ARGS SOR 10000
+perf inject $J_INJECT_ARGS -o $OUT/records/java_SOR.data.jitted -i $OUT/records/java_SOR.data
+perf annotate $J_ANNOTATE_ARDS -i $OUT/records/java_SOR.data.jitted > $OUT/records/java_SOR.annotate.txt
 
-#cp Viewer.java $output_folder/viewer
+javac -d $OUT/compiled tests/LU.java
+perf record $J_RECORD_ARGS -o $OUT/records/java_LU.data java $J_RECORD_JVM_ARGS LU 300000
+perf inject $J_INJECT_ARGS -o $OUT/records/java_LU.data.jitted -i $OUT/records/java_LU.data
+perf annotate $J_ANNOTATE_ARDS -i $OUT/records/java_LU.data.jitted > $OUT/records/java_LU.annotate.txt
 
-# compile viewer
-#javac -d $output_folder/viewer Viewer.java
+javac -d $OUT/compiled tests/SPARSE.java
+perf record $J_RECORD_ARGS -o $OUT/records/java_SPARSE.data java $J_RECORD_JVM_ARGS SPARSE 100000000
+perf inject $J_INJECT_ARGS -o $OUT/records/java_SPARSE.data.jitted -i $OUT/records/java_SPARSE.data
+perf annotate $J_ANNOTATE_ARDS -i $OUT/records/java_SPARSE.data.jitted > $OUT/records/java_SPARSE.annotate.txt
+
+javac -d $OUT/compiled tests/QuickSort.java
+perf record $J_RECORD_ARGS -o $OUT/records/java_QuickSort.data java $J_RECORD_JVM_ARGS QuickSort numbers.txt
+perf inject $J_INJECT_ARGS -o $OUT/records/java_QuickSort.data.jitted -i $OUT/records/java_QuickSort.data
+perf annotate $J_ANNOTATE_ARDS -i $OUT/records/java_QuickSort.data.jitted > $OUT/records/java_QuickSort.annotate.txt
 
 
-#perf record -g -k mono java -cp "$classpath" -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -agentpath:"$jvmtisopath":perf-map-agent/out/libperfmap.so "$classinput"
-# Generate folded stack traces
+
+# viewer
+#mkdir -p $OUT/viewer
+#cp Viewer.java $OUT/viewer
+#javac -d $OUT/viewer Viewer.java
+
+# flamegraphs
+#perf record -g -k mono java -cp "$classpath" -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -agentpath:"$jvmtisopath":perf-map-agent/$OUT/libperfmap.so "$classinput"
 #perf script -F+srcline -i "$perf_data" | flamegraph/stackcollapse-perf.pl > "$perf_folded"
-# Generate flame graph
 #flamegraph/flamegraph.pl "$perf_folded" > "$flamegraph_svg"
