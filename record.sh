@@ -59,9 +59,11 @@ perf annotate $J_ANNOTATE_ARDS -i $OUT/records/java_QuickSort.data.jitted > $OUT
 
 
 # viewer
-#mkdir -p $OUT/viewer
-#cp Viewer.java $OUT/viewer
-#javac -d $OUT/viewer Viewer.java
+mkdir -p $OUT/viewer
+cp Main.java $OUT/viewer
+javac -d $OUT/viewer Main.java
+
+java -cp $OUT/viewer Main $OUT/records/c_QuickSort_annotate.txt $OUT/records/c_QuickSort_annotate.txt
 
 # flamegraphs
 #perf record -g -k mono java -cp "$classpath" -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -agentpath:"$jvmtisopath":perf-map-agent/$OUT/libperfmap.so "$classinput"

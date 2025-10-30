@@ -1,5 +1,3 @@
-package com.issougames;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -9,14 +7,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 public class Main {
+    // arg 1 = annotate file and arg 2 = binary file if C
     public static void main(String[] args){
+
 
         // read file
         String content ="";
         try {
-            String path = "c_QuickSort_annotate.txt";
+            String path = args[1];
             content =  new String(Files.readAllBytes(Paths.get(path)));
         } catch (IOException e) {
             e.printStackTrace();
@@ -118,24 +120,67 @@ public class Main {
                 assembly.address = matcher.group(2);
                 assembly.assembly = matcher.group(3).trim();
                 currentLineOfCode.assemblies.add(assembly);
+
+                // if c find line of current line TODO remove if java
+                currentLineOfCode.line = runAddr2Line(args[1], assembly.address);
             } else {
-
                 // test if
-
                 currentLineOfCode = new LineOfCode();
                 currentLineOfCode.code = line.trim();
                 linesOfCode.add(currentLineOfCode);
             }
         }
 
+        // merge lines if they have the same line
+        Map<Integer, LineOfCode> lineMap = new HashMap<>();
+        List<LineOfCode> lineOfCodeMerged = new ArrayList<>();
+        for (LineOfCode loc : linesOfCode) {
+            if (loc.line != -1 && lineMap.containsKey(loc.line)) {
+                LineOfCode existing = lineMap.get(loc.line);
+                existing.assemblies.addAll(loc.assemblies);
+            } else {
+                lineMap.put(loc.line, loc);
+                lineOfCodeMerged.add(loc);
+            }
+        }
 
         // pretty print
-        for (LineOfCode lineOfCode : linesOfCode) {
-            System.out.println(lineOfCode);
-        }
+        prettyPrint(lineOfCodeMerged);
     }
 
-    void prettyPrint(List<LineOfCode> linesOfCode) {
+    static int runAddr2Line(String binaryPath, String address) {
+        try {
+            // Build the command
+            ProcessBuilder pb = new ProcessBuilder(
+                    "/usr/bin/addr2line", "-e", binaryPath, address
+            );
+            pb.redirectErrorStream(true); // merge stderr with stdout
+
+            // Start the process
+            Process process = pb.start();
+
+            // Read its output
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println(line);
+                }
+            }
+
+            // Wait for the process to exit
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                System.err.println("addr2line exited with code " + exitCode);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    static void prettyPrint(List<LineOfCode> linesOfCode) {
         int indent = 0;
         for (LineOfCode lineOfCode : linesOfCode) {
             // print samples
@@ -158,7 +203,7 @@ public class Main {
 
     static class LineOfCode {
         String code;
-        int line;
+        int line =-1;
         List<LineOfAssembly> assemblies = new ArrayList<>();
 
         int samples(){
