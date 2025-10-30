@@ -1,5 +1,7 @@
 #!/bin/bash
 
+module load Java/21.0.
+
 OUT="results/$(date "+%Y%m%d_%H%M%S")"
 
 mkdir -p $OUT/sources
@@ -30,7 +32,7 @@ perf annotate $C_ANNOTATE_ARGS -i $OUT/records/c_QuickSort.data > $OUT/records/c
 
 
 J_RECORD_ARGS="-F 10000 -e cycles:u -g -k 1"
-J_RECORD_JVM_ARGS="-cp $OUT/compiled -Xmx8g -agentpath:/usr/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer"
+J_RECORD_JVM_ARGS="-cp $OUT/compiled -Xmx16g -agentpath:/usr/lib64/libperf-jvmti.so -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer"
 J_INJECT_ARGS="--jit"
 J_ANNOTATE_ARDS="--stdio --source -n"
 
@@ -65,3 +67,7 @@ perf annotate $J_ANNOTATE_ARDS -i $OUT/records/java_QuickSort.data.jitted > $OUT
 #perf record -g -k mono java -cp "$classpath" -XX:+UnlockDiagnosticVMOptions -XX:+PreserveFramePointer -agentpath:"$jvmtisopath":perf-map-agent/$OUT/libperfmap.so "$classinput"
 #perf script -F+srcline -i "$perf_data" | flamegraph/stackcollapse-perf.pl > "$perf_folded"
 #flamegraph/flamegraph.pl "$perf_folded" > "$flamegraph_svg"
+
+# to connect
+#ssh  basto97@login.deucalion.macc.fccn.pt
+#srun --time=04:00:00 --partition=normal-arm --account=f202412862cpcaa1a --nodes=1 --pty bash
