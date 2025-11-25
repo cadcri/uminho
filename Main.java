@@ -14,11 +14,26 @@ public class Main {
     // arg 1 = annotate file and arg 2 = binary file if C
     public static void main(String[] args){
 
+        List<LineOfCode> linesFileOne = getLinesFromAnnotateFile(args[1]);
+        List<LineOfCode> linesFileTwo = null;
+
+        if (args.length > 2)
+            linesFileTwo = getLinesFromAnnotateFile(args[2]);
+
+        prettyPrint(linesFileOne, linesFileTwo);
+    }
+
+    static List<LineOfCode> getLinesFromAnnotateFile(String path){
+        String filename = path.substring(path.lastIndexOf('/') + 1);
+
+        // remove prefix (c_ or java_) and suffix (_annotate.txt)
+        filename = filename.replaceFirst("^(?:c_|java_)", "");
+        filename = filename.replaceFirst("_annotate\\.txt$", "");
 
         // read file
         String content ="";
         try {
-            String path = args[1];
+
             content =  new String(Files.readAllBytes(Paths.get(path)));
         } catch (IOException e) {
             e.printStackTrace();
@@ -84,7 +99,7 @@ public class Main {
                 sections.put(key, value);
         }
 
-        String text = sections.get("QuickSort");
+        String text = sections.get(filename);
 
         // Remove the first lines of context
         String[] lines = text.split("\n");
@@ -112,6 +127,7 @@ public class Main {
         List<LineOfCode> linesOfCode = new ArrayList<>();
         Pattern assemblyPattern = Pattern.compile("^(\\d+)\\s*:\\s*([0-9a-f]+):\\s*(.+)$");
         LineOfCode currentLineOfCode = null;
+        int indent = 0;
         for (String line : text.split("\n")) {
             Matcher matcher = assemblyPattern.matcher(line.trim());
             if (matcher.matches()) {
@@ -122,11 +138,18 @@ public class Main {
                 currentLineOfCode.assemblies.add(assembly);
 
                 // if c find line of current line TODO remove if java
-                currentLineOfCode.line = runAddr2Line(args[1], assembly.address);
+                currentLineOfCode.line = runAddr2Line(path, assembly.address);
             } else {
                 // test if
                 currentLineOfCode = new LineOfCode();
                 currentLineOfCode.code = line.trim();
+                if(currentLineOfCode.code.endsWith("}")) {
+                    indent--;
+                }
+                currentLineOfCode.indent = indent;
+                if (currentLineOfCode.code.endsWith("{")) {
+                    indent++;
+                }
                 linesOfCode.add(currentLineOfCode);
             }
         }
@@ -144,22 +167,18 @@ public class Main {
             }
         }
 
-        // pretty print
-        prettyPrint(lineOfCodeMerged);
+        return lineOfCodeMerged;
     }
 
     static int runAddr2Line(String binaryPath, String address) {
         try {
-            // Build the command
             ProcessBuilder pb = new ProcessBuilder(
                     "/usr/bin/addr2line", "-e", binaryPath, address
             );
             pb.redirectErrorStream(true); // merge stderr with stdout
 
-            // Start the process
             Process process = pb.start();
 
-            // Read its output
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream()))) {
                 String line;
@@ -168,7 +187,6 @@ public class Main {
                 }
             }
 
-            // Wait for the process to exit
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 System.err.println("addr2line exited with code " + exitCode);
@@ -180,30 +198,60 @@ public class Main {
         return -1;
     }
 
-    static void prettyPrint(List<LineOfCode> linesOfCode) {
-        int indent = 0;
+    static void prettyPrint(List<LineOfCode> linesOfCode, List<LineOfCode> linesOfCodeTwo) {
+
+        int line_char_size_max = 0;
+
         for (LineOfCode lineOfCode : linesOfCode) {
-            // print samples
-            String samples = String.format("%05d", lineOfCode.samples());
-            System.out.print(samples+"|  ");
-            if(lineOfCode.code.endsWith("}")) {
-                indent--;
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("%06d", lineOfCode.samples())).append("  ");
+            for (int i = 0; i < lineOfCode.indent; i++) {
+                sb.append("  ");
             }
-            for (int i = 0; i < indent; i++) {
-                System.out.print("  ");
+            sb.append(lineOfCode.code);
+            line_char_size_max = Math.max(line_char_size_max, sb.length());
+        }
+
+        int maxSize = linesOfCodeTwo != null ? Math.max(linesOfCode.size(), linesOfCodeTwo.size()) : linesOfCode.size();
+
+        for (int i = 0; i < maxSize; i++) {
+            StringBuilder sb = new StringBuilder();
+
+            if (i < linesOfCode.size()) {
+                LineOfCode lineOfCode = linesOfCode.get(i);
+                sb.append(String.format("%06d", lineOfCode.samples())).append("  ");
+                for (int j = 0; j < lineOfCode.indent; j++) {
+                    sb.append("  ");
+                }
+                sb.append(lineOfCode.code);
             }
-            System.out.println(lineOfCode.code);
-            if (lineOfCode.code.endsWith("{")) {
-                indent++;
+
+            if (linesOfCodeTwo != null) {
+                while (sb.length() < line_char_size_max) {
+                    sb.append(" ");
+                }
+
+                sb.append(" | ");
+
+                if (i < linesOfCodeTwo.size()) {
+                    LineOfCode lineOfCodeTwo = linesOfCodeTwo.get(i);
+                    sb.append(String.format("%06d", lineOfCodeTwo.samples())).append("  ");
+                    for (int j = 0; j < lineOfCodeTwo.indent; j++) {
+                        sb.append("  ");
+                    }
+                    sb.append(lineOfCodeTwo.code);
+                }
             }
+
+            System.out.println(sb.toString());
         }
     }
-
 
 
     static class LineOfCode {
         String code;
         int line =-1;
+        int indent = 0;
         List<LineOfAssembly> assemblies = new ArrayList<>();
 
         int samples(){
@@ -213,31 +261,11 @@ public class Main {
             }
             return samples;
         }
-
-        @Override
-        public String toString() {
-            final StringBuilder sb = new StringBuilder("LineOfCode{");
-            sb.append("code='").append(code).append('\'');
-            sb.append(", line=").append(line);
-            sb.append(", assemblies=").append(assemblies);
-            sb.append('}');
-            return sb.toString();
-        }
     }
 
     static class LineOfAssembly {
         String assembly;
         int samples;
         String address;
-
-        @Override
-        public String toString() {
-            final StringBuilder sb = new StringBuilder("LineOfAssembly{");
-            sb.append("assembly='").append(assembly).append('\'');
-            sb.append(", samples=").append(samples);
-            sb.append(", address='").append(address).append('\'');
-            sb.append('}');
-            return sb.toString();
-        }
     }
 }
